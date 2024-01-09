@@ -89,11 +89,11 @@ def get_puzzle_id(soup: BeautifulSoup) -> str:
         return soup.select_one("[data-source='number'] .pi-data-value.pi-font").contents[0]
 
 
-def get_puzzle_hint(soup: BeautifulSoup, type: t.Literal["1", "2", "3", "Special"]) -> str:
+def get_puzzle_hint(soup: BeautifulSoup, hint_type: t.Literal["1", "2", "3", "Special"]) -> str:
     """
     Given the hint type, returns the associated hint found in the puzzle.
     """
-    background_color = type2color.get(type, None)
+    background_color = type2color.get(hint_type, None)
     base = f"[style='height:200px; overflow-y:auto; overflow-x:hidden; word-wrap:break-word; overflow: -moz-scrollbars-vertical; line-height:normal; border: 2px solid black; padding:3px; background:{background_color}; font-size:14px'] dl"
     hint = ""
     while (h := soup.select_one(f"{base}+p")) is not None:
@@ -104,7 +104,7 @@ def get_puzzle_hint(soup: BeautifulSoup, type: t.Literal["1", "2", "3", "Special
         return hint
     else:
         hint = soup.select(
-            "[style='height:200px; overflow-y:auto; overflow-x:hidden; word-wrap:break-word; overflow: -moz-scrollbars-vertical; line-height:normal; border: 2px solid black; padding:3px; background:#E8E8B8; font-size:14px'] p"
+            f"[style='height:200px; overflow-y:auto; overflow-x:hidden; word-wrap:break-word; overflow: -moz-scrollbars-vertical; line-height:normal; border: 2px solid black; padding:3px; background:{background_color}; font-size:14px'] p"
         )
         clean_content = ""
         for h in hint:
@@ -130,6 +130,8 @@ def get_puzzle_solution(soup: BeautifulSoup) -> str:
     correct_element = soup.find(id="Correct")
     navbox_element = soup.select_one(".navbox.mw-collapsible.mw-collapsed tbody")
     nodes_between_elements = []
+    if correct_element is None:
+        return
     current_element = correct_element.find_next()
     dl_encountered = 0
     while (current_element and current_element.find_next() != navbox_element) and dl_encountered < 2:
@@ -147,33 +149,72 @@ if __name__ == "__main__":
         "category": [],
         "description": [],
         "img": [],
+        "url": [],
         "picarats": [],
         "first_hint": [],
         "second_hint": [],
         "third_hint": [],
         "special_hint": [],
+        "solution": [],
     }
-    for puzzle_html_name in tqdm(os.listdir(f"{ROOT_DIR}/layton-data/htmls")[509 + 169 :]):
+    sizes = []
+    for puzzle_html_name in tqdm(os.listdir(f"{ROOT_DIR}/layton-data/htmls")[-10:]):
         puzzle_name = puzzle_html_name.replace(".html", "")
         img_path = f"{ROOT_DIR}/layton-data/images/{puzzle_name}.jpg"
         img = Image.open(img_path) if os.path.exists(img_path) else None
+        img_path = img_path if os.path.exists(img_path) else None
         soup = get_file_soup(f"{ROOT_DIR}/layton-data/htmls/{puzzle_name}.html")
         category = get_puzzle_category(soup)
         description = get_puzzle_description(soup)
+        if description is not None:
+            description = str(description).replace(".", ".\n")
+        solution = get_puzzle_solution(soup)
+        if solution is not None:
+            solution = str(solution).replace(".", ".\n")
         puzzle_id = get_puzzle_id(soup)
+        url = f"layton.fandom.com/wiki/Puzzle:{puzzle_name}"
         picarats = get_puzzle_picarats(soup)
         first_hint = get_puzzle_hint(soup, "1")
+        if first_hint is not None:
+            first_hint = str(first_hint).replace(".", ".\n")
         second_hint = get_puzzle_hint(soup, "2")
+        if second_hint is not None:
+            second_hint = str(second_hint).replace(".", ".\n")
         third_hint = get_puzzle_hint(soup, "3")
+        if third_hint is not None:
+            third_hint = str(third_hint).replace(".", ".\n")
         special_hint = get_puzzle_hint(soup, "Special")
+        if special_hint is not None:
+            special_hint = str(special_hint).replace(".", ".\n")
+        sizes.append(img.size if img is not None else None)
         df["id"].append(puzzle_id)
         df["category"].append(category)
         df["description"].append(description)
-        df["img"].append(img)
+        df["img"].append(img_path)
+        df["url"].append(url)
         df["picarats"].append(picarats)
         df["first_hint"].append(first_hint)
         df["second_hint"].append(second_hint)
         df["third_hint"].append(third_hint)
         df["special_hint"].append(special_hint)
+        df["solution"].append(solution)
     df = pd.DataFrame(df)
-    df.to_excel(f"{ROOT_DIR}/layton-annotations.xlsx")
+    with pd.ExcelWriter(f"{ROOT_DIR}/layton-annotations.xlsx", engine="xlsxwriter") as writer:
+        workbook = writer.book
+        worksheet = workbook.add_worksheet()
+        img_col_index = df.columns.get_loc("img")
+        for i, (img_path, url) in enumerate(zip(df["img"], df["url"])):
+            if sizes[i] is not None:
+                width, height = sizes[i]
+                scale_x, scale_y = 200 / width, 200 / height
+            if img_path is not None:
+                worksheet.insert_image(i + 1, img_col_index, img_path, {"x_scale": scale_x, "y_scale": scale_y})
+                worksheet.set_row_pixels(i + 1, 200)
+            worksheet.write_url(i + 1, 4, url)
+        worksheet.set_column_pixels(img_col_index, img_col_index, 200)
+        worksheet.set_column_pixels(2, 2, 1100)
+        worksheet.set_column_pixels(6, 9, 900)
+        worksheet.set_column_pixels(4, 4, 400)
+        worksheet.set_column_pixels(1, 1, 150)
+        worksheet.set_column_pixels(10, 10, 1000)
+        df.to_excel(writer, index=False, header=True, engine="xlsxwriter")
