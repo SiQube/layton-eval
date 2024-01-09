@@ -116,7 +116,7 @@ def get_puzzle_hint(soup: BeautifulSoup, hint_type: t.Literal["1", "2", "3", "Sp
                         clean_content += c
                     elif str(c) == "<br/>":
                         clean_content += "\n"
-                    elif str(c).startswith("<img"):
+                    elif str(c).startswith("<img") or str(c).startswith("<a"):
                         continue
                     else:
                         clean_content += c.contents[0]
@@ -136,7 +136,17 @@ def get_puzzle_solution(soup: BeautifulSoup) -> str:
     dl_encountered = 0
     while (current_element and current_element.find_next() != navbox_element) and dl_encountered < 2:
         if str(current_element).startswith("<p>"):
-            nodes_between_elements.append(current_element.contents[0])
+            clean_content = ""
+            for elem in current_element.contents:
+                if str(elem).startswith('''<a class="image"'''):
+                    nodes_between_elements.append(current_element)
+                elif isinstance(elem, bs4.element.NavigableString):
+                    clean_content += elem
+                else:
+                    for c in elem.contents:
+                        if str(c) != "<br/>":
+                            clean_content += c
+            nodes_between_elements.append(clean_content)
         elif str(current_element).startswith("<dl>"):
             dl_encountered += 1
         elif str(current_element).startswith("<i>"):  # No solution documented
