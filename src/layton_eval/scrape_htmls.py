@@ -218,10 +218,10 @@ if __name__ == "__main__":
         for i, (img_path, url) in enumerate(zip(df["img"], df["url"])):
             if sizes[i] is not None:
                 width, height = sizes[i]
-                scale_x, scale_y = 200 / width, 200 / height
+                scale_x, scale_y = 350 / width, 350 / height
             if img_path is not None:
                 worksheet.insert_image(i + 1, img_col_index, img_path, {"x_scale": scale_x, "y_scale": scale_y})
-                worksheet.set_row_pixels(i + 1, 200)
+            worksheet.set_row_pixels(i + 1, 350)
             worksheet.write_url(i + 1, 4, url)
         worksheet.set_column_pixels(img_col_index, img_col_index, 200)
         worksheet.set_column_pixels(2, 2, 1100)
