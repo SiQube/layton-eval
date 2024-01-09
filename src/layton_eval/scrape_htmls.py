@@ -158,7 +158,7 @@ if __name__ == "__main__":
         "solution": [],
     }
     sizes = []
-    for puzzle_html_name in tqdm(os.listdir(f"{ROOT_DIR}/layton-data/htmls")[-10:]):
+    for puzzle_html_name in tqdm(os.listdir(f"{ROOT_DIR}/layton-data/htmls")):
         puzzle_name = puzzle_html_name.replace(".html", "")
         img_path = f"{ROOT_DIR}/layton-data/images/{puzzle_name}.jpg"
         img = Image.open(img_path) if os.path.exists(img_path) else None
