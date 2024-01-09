@@ -139,6 +139,8 @@ def get_puzzle_solution(soup: BeautifulSoup) -> str:
             nodes_between_elements.append(current_element.contents[0])
         elif str(current_element).startswith("<dl>"):
             dl_encountered += 1
+        elif str(current_element).startswith("<i>"):  # No solution documented
+            return
         current_element = current_element.find_next()
     return "\n".join(nodes_between_elements)
 
