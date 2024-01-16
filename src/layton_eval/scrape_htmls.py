@@ -20,6 +20,10 @@ def get_file_soup(path: str) -> BeautifulSoup:
     return BeautifulSoup(content, "html.parser")
 
 
+def load_answer_image(puzzle_name: str):
+    return Image.open(f"{ROOT_DIR}/layton-data/answer_images/{puzzle_name}.jpg")
+
+
 def load_puzzle_image(puzzle_name: str):
     return Image.open(f"{ROOT_DIR}/layton-data/images/{puzzle_name}.jpg")
 
@@ -53,7 +57,7 @@ def get_puzzle_description(soup: BeautifulSoup) -> t.List[str] | str:
                     clean_content += elem
                 else:
                     for c in elem.contents:
-                        if str(c) != "<br/>":
+                        if str(c) != "<br/>" and not str(c).startswith("<img"):
                             clean_content += c
             nodes_between_elements.append(clean_content)
         elif str(current_element).startswith("<dl>"):
@@ -144,7 +148,7 @@ def get_puzzle_solution(soup: BeautifulSoup) -> str:
                     clean_content += elem
                 else:
                     for c in elem.contents:
-                        if str(c) != "<br/>":
+                        if str(c) != "<br/>" and not str(c).startswith("<img"):
                             clean_content += c
             nodes_between_elements.append(clean_content)
         elif str(current_element).startswith("<dl>"):
@@ -168,13 +172,18 @@ if __name__ == "__main__":
         "third_hint": [],
         "special_hint": [],
         "solution": [],
+        "answer_img": [],
     }
+    answer_sizes = []
     sizes = []
     for puzzle_html_name in tqdm(os.listdir(f"{ROOT_DIR}/layton-data/htmls")):
         puzzle_name = puzzle_html_name.replace(".html", "")
         img_path = f"{ROOT_DIR}/layton-data/images/{puzzle_name}.jpg"
+        answer_img_path = f"{ROOT_DIR}/layton-data/answer_images/{puzzle_name}.jpg"
         img = Image.open(img_path) if os.path.exists(img_path) else None
+        answer_img = Image.open(answer_img_path) if os.path.exists(answer_img_path) else None
         img_path = img_path if os.path.exists(img_path) else None
+        answer_img_path = answer_img_path if os.path.exists(answer_img_path) else None
         soup = get_file_soup(f"{ROOT_DIR}/layton-data/htmls/{puzzle_name}.html")
         category = get_puzzle_category(soup)
         description = get_puzzle_description(soup)
@@ -199,10 +208,12 @@ if __name__ == "__main__":
         if special_hint is not None:
             special_hint = str(special_hint).replace(".", ".\n")
         sizes.append(img.size if img is not None else None)
+        answer_sizes.append(answer_img.size if answer_img is not None else None)
         df["id"].append(puzzle_id)
         df["category"].append(category)
         df["description"].append(description)
         df["img"].append(img_path)
+        df["answer_img"].append(answer_img_path)
         df["url"].append(url)
         df["picarats"].append(picarats)
         df["first_hint"].append(first_hint)
@@ -215,15 +226,24 @@ if __name__ == "__main__":
         workbook = writer.book
         worksheet = workbook.add_worksheet()
         img_col_index = df.columns.get_loc("img")
-        for i, (img_path, url) in enumerate(zip(df["img"], df["url"])):
+        answer_img_col_index = df.columns.get_loc("answer_img")
+        for i, (answer_img_path, img_path, url) in enumerate(zip(df["answer_img"], df["img"], df["url"])):
             if sizes[i] is not None:
                 width, height = sizes[i]
                 scale_x, scale_y = 350 / width, 350 / height
+            if answer_sizes[i] is not None:
+                answer_width, answer_height = answer_sizes[i]
+                answer_scale_x, answer_scale_y = 350 / answer_width, 350 / answer_height
             if img_path is not None:
                 worksheet.insert_image(i + 1, img_col_index, img_path, {"x_scale": scale_x, "y_scale": scale_y})
+            if answer_img_path is not None:
+                worksheet.insert_image(
+                    i + 1, answer_img_col_index, answer_img_path, {"x_scale": answer_scale_x, "y_scale": answer_scale_y}
+                )
             worksheet.set_row_pixels(i + 1, 350)
             worksheet.write_url(i + 1, 4, url)
-        worksheet.set_column_pixels(img_col_index, img_col_index, 200)
+        worksheet.set_column_pixels(img_col_index, img_col_index, 350)
+        worksheet.set_column_pixels(answer_img_col_index, answer_img_col_index, 350)
         worksheet.set_column_pixels(2, 2, 1100)
         worksheet.set_column_pixels(6, 9, 900)
         worksheet.set_column_pixels(4, 4, 400)
